@@ -82,9 +82,9 @@ Output:
 ### Playbook:
 Output:
 ``` bash
-❯$ ansible-playbook  ADS.yml  --syntax-check
+❯$ ansible-playbook  install_aws_discovery_agent.yml  --syntax-check
 [WARNING]: No inventory was parsed, only implicit localhost is available
 [WARNING]: provided hosts list is empty, only localhost is available. Note that the implicit localhost does not
 match 'all'
-playbook: ADS.yml
+playbook: install_aws_discovery_agent.yml
 ```
