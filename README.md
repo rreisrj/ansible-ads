@@ -21,8 +21,6 @@ Define Windows and Linux servers on Inventory File
 ```yaml
 all:
   vars:
-    ansible_user: "{{ lookup('env', 'USER') }}"
-    ansible_password: "{{ lookup('env', 'PASSWORD') }}"
     aws_region: "your-home-region"
     aws_access_key_id: "aws-access-key-id"
     aws_secret_access_key: "aws-secret-access-key"
