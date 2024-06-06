@@ -1,0 +1,92 @@
+---
+- name: Install AWS Discovery Service Agent
+  hosts: all
+  gather_facts: yes
+  vars:
+    agent_url_windows: "https://s3.us-west-2.amazonaws.com/aws-discovery-agent.us-west-2/windows/latest/AWSDiscoveryAgentInstaller.exe"
+    agent_url_linux: "https://s3-us-west-2.amazonaws.com/aws-discovery-agent.us-west-2/linux/latest/aws-discovery-agent.tar.gz"
+    agent_temp_path_windows: "c:/temp/AWSDiscoveryAgentInstaller.exe"
+    agent_temp_path_linux: "/tmp/aws-discovery-agent.tar.gz"
+    valid_windows_versions:
+      - 5.2
+      - 6.0
+      - 6.1
+      - 6.2
+      - 6.3
+      - 10.0.14393
+      - 10.0.17763
+      - 10.0.20348
+    valid_linux_versions:
+      - 5.11
+      - 6.10
+      - 7.3
+      - 7.7
+      - 8.1
+  tasks:
+    - name: Check if AWS Discovery Agent is installed (Windows)
+      win_command: Get-Service -Name "AWSDiscoveryAgent"
+      register: windows_agent_installed
+      ignore_errors: yes
+      when: ansible_os_family == "Windows"
+
+    - name: Check if AWS Discovery Agent is installed (Linux)
+      command: systemctl is-active aws-discovery-agent
+      register: linux_agent_installed
+      ignore_errors: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Skip installation if agent is already installed (Windows)
+      win_command: echo "AWS Discovery Agent already installed on {{ ansible_hostname }}"
+      when: windows_agent_installed.rc == 0
+
+    - name: Skip installation if agent is already installed (Linux)
+      command: echo "AWS Discovery Agent already installed on {{ ansible_hostname }}"
+      when: linux_agent_installed.rc == 0
+
+    - name: Download AWS Discovery Agent (Windows)
+      win_get_url:
+        url: "{{ agent_url_windows }}"
+        dest: "{{ agent_temp_path_windows }}"
+      when: ansible_os_family == "Windows" and windows_agent_installed.rc != 0 and (ansible_os_version | version_compare(valid_windows_versions, 'in'))
+
+    - name: Download AWS Discovery Agent (Linux)
+      get_url:
+        url: "{{ agent_url_linux }}"
+        dest: "{{ agent_temp_path_linux }}"
+      when: ansible_os_family == "RedHat" and linux_agent_installed.rc != 0 and (ansible_distribution_version in valid_linux_versions)
+
+    - name: Install AWS Discovery Agent (Windows)
+      win_command: "{{ agent_temp_path_windows }} REGION={{ aws_region }} KEY_ID={{ aws_access_key_id }} KEY_SECRET={{ aws_secret_access_key }} /quiet"
+      when: ansible_os_family == "Windows" and windows_agent_installed.rc != 0 and (ansible_os_version | version_compare(valid_windows_versions, 'in'))
+
+    - name: Extract AWS Discovery Agent tarball (Linux)
+      command: tar -xzf {{ agent_temp_path_linux }} -C /tmp
+      when: ansible_os_family == "RedHat" and linux_agent_installed.rc != 0 and (ansible_distribution_version in valid_linux_versions)
+
+    - name: Install AWS Discovery Agent (Linux)
+      command: sudo bash /tmp/aws-discovery-agent/install -r {{ aws_region }} -k {{ aws_access_key_id }} -s {{ aws_secret_access_key }}
+      when: ansible_os_family == "RedHat" and linux_agent_installed.rc != 0 and (ansible_distribution_version in valid_linux_versions)
+
+    - name: Ensure AWS Discovery Agent service is running (Windows)
+      win_service:
+        name: AWSDiscoveryAgent
+        start_mode: auto
+        state: started
+      when: ansible_os_family == "Windows" and windows_agent_installed.rc != 0 and (ansible_os_version | version_compare(valid_windows_versions, 'in'))
+
+    - name: Ensure AWS Discovery Agent service is running (Linux)
+      service:
+        name: aws-discovery-agent
+        state: started
+        enabled: yes
+      when: ansible_os_family == "RedHat" and linux_agent_installed.rc != 0 and (ansible_distribution_version in valid_linux_versions)
+
+    - name: Log the installation status
+      local_action:
+        module: copy
+        content: "{{ ansible_hostname }}: {{ item.msg }}"
+        dest: "centralized_report.log"
+      with_items:
+        - "{{ 'AWS Discovery Agent already installed' if (ansible_os_family == 'Windows' and windows_agent_installed.rc == 0) or (ansible_os_family == 'RedHat' and linux_agent_installed.rc == 0) else '' }}"
+        - "{{ 'AWS Discovery Agent installation failed' if (ansible_os_family == 'Windows' and windows_agent_installed.rc != 0 and install_aws_discovery_agent_windows.failed) or (ansible_os_family == 'RedHat' and linux_agent_installed.rc != 0 and install_aws_discovery_agent_linux.failed) else '' }}"
+        - "{{ 'AWS Discovery Agent installed successfully' if (ansible_os_family == 'Windows' and windows_agent_installed.rc != 0 and not install_aws_discovery_agent_windows.failed) or (ansible_os_family == 'RedHat' and linux_agent_installed.rc != 0 and not install_aws_discovery_agent_linux.failed) else '' }}"
