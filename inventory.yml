@@ -1,0 +1,25 @@
+---
+all:
+  vars:
+    aws_region: "your-home-region"
+    aws_access_key_id: "aws-access-key-id"
+    aws_secret_access_key: "aws-secret-access-key"
+    ansible_connection: "winrm"
+    ansible_winrm_transport: "ntlm"
+    ansible_winrm_server_cert_validation: "ignore"
+  children:
+    windows:
+      vars:
+        ansible_user: "Admin"
+        ansible_password: "windows_password"
+      hosts: {}
+        # - windows-server-1
+        # - windows-server-2
+    linux:
+      vars:
+        ansible_user: "root"
+        ansible_password: "linux_password"
+      hosts: {}
+        # - linux-server-rhel1
+        # - linux-server-rhel2
+        # - linux-server-rhel3
